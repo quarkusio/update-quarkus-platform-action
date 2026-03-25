@@ -304,7 +304,7 @@ public class UpdatePlatformMembersAction {
         platformMemberService.updateVersionProperty(pomPath, member.getVersionProperty(), latestVersion);
 
         // Run ./mvnw -Dsync
-        int syncResult = processes.execute(List.of("./mvnw", "-Dsync"), repoDir);
+        int syncResult = processes.execute(List.of("./mvnw", "-B", "--no-transfer-progress", "-Dsync"), repoDir);
         if (syncResult != 0) {
             throw new RuntimeException("./mvnw -Dsync failed for " + member.getName() + " with exit code " + syncResult);
         }

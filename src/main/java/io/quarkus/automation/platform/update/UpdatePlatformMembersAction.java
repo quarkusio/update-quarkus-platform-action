@@ -317,7 +317,7 @@ public class UpdatePlatformMembersAction {
     }
 
     static String buildBranchName(String baseBranch, PlatformMember member, String newVersion) {
-        return "update-platform/"
+        return "update-automation/"
                 + baseBranch + "-"
                 + member.getName().toLowerCase(Locale.ROOT).replace(" ", "-")
                 + "-" + newVersion;

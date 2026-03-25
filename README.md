@@ -139,7 +139,7 @@ If both an exact branch entry and `latest` resolve to the same branch, the exact
 
 ## Pull requests
 
-- **Branch naming**: `update-platform/{base-branch}-{member-name}-{version}` (e.g. `update-platform/main-camel-3.18.0`)
+- **Branch naming**: `update-automation/{base-branch}-{member-name}-{version}` (e.g. `update-automation/main-camel-3.18.0`)
 - **Deduplication**: if a PR already exists for a given branch name, the action skips that member
 - **Commit author**: `github-actions[bot]`
 

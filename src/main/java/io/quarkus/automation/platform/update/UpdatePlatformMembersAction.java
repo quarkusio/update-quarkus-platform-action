@@ -272,16 +272,10 @@ public class UpdatePlatformMembersAction {
         Optional<String> latestOpt = versionResolver.getLatestRelease(member.getGroupId(), member.getArtifactId(),
                 member.getCurrentVersion(), policy);
         if (latestOpt.isEmpty()) {
-            commands.warning("Could not resolve latest version for " + member.getName());
-            return false;
-        }
-        String latestVersion = latestOpt.get();
-
-        // Compare versions (getLatestRelease already filters, but double-check)
-        if (!versionResolver.isNewer(member.getCurrentVersion(), latestVersion)) {
             commands.notice(member.getName() + " is up to date at " + member.getCurrentVersion());
             return false;
         }
+        String latestVersion = latestOpt.get();
 
         commands.notice(member.getName() + " has update available: " + member.getCurrentVersion() + " -> " + latestVersion);
 
@@ -324,7 +318,7 @@ public class UpdatePlatformMembersAction {
 
     static String buildBranchName(String baseBranch, PlatformMember member, String newVersion) {
         return "update-platform/"
-                + baseBranch + "/"
+                + baseBranch + "-"
                 + member.getName().toLowerCase(Locale.ROOT).replace(" ", "-")
                 + "-" + newVersion;
     }

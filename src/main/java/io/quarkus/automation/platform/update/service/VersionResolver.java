@@ -56,9 +56,8 @@ public class VersionResolver {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                LOG.warnf("Failed to fetch maven-metadata.xml for %s:%s (HTTP %d)", groupId, artifactId,
-                        response.statusCode());
-                return Optional.empty();
+                throw new IllegalStateException("Failed to fetch maven-metadata.xml for " + groupId + ":" + artifactId
+                        + " (HTTP " + response.statusCode() + ")");
             }
 
             Document doc = Document.of(response.body());
@@ -67,8 +66,8 @@ public class VersionResolver {
 
             Optional<Element> versioning = root.childElement("versioning");
             if (versioning.isEmpty()) {
-                LOG.warnf("No <versioning> element in maven-metadata.xml for %s:%s", groupId, artifactId);
-                return Optional.empty();
+                throw new IllegalStateException("No <versioning> element in maven-metadata.xml for "
+                        + groupId + ":" + artifactId);
             }
 
             // For ANY policy, try the <release> shortcut first (it's usually a final version)
@@ -84,9 +83,11 @@ public class VersionResolver {
             // Scan all versions and find the newest final one matching the policy
             return findBestMatchingVersion(versioning.get(), currentVersion, policy, groupId, artifactId);
 
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
-            LOG.warnf("Error fetching latest version for %s:%s: %s", groupId, artifactId, e.getMessage());
-            return Optional.empty();
+            throw new IllegalStateException("Error fetching latest version for " + groupId + ":" + artifactId
+                    + ": " + e.getMessage(), e);
         }
     }
 

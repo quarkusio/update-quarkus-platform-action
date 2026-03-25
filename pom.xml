@@ -6,6 +6,7 @@
     <version>999-SNAPSHOT</version>
     <name>Update Quarkus Platform GitHub Action</name>
     <description>Updates Quarkus Platform members</description>
+    <packaging>quarkus</packaging>
 
     <properties>
         <compiler-plugin.version>3.15.0</compiler-plugin.version>

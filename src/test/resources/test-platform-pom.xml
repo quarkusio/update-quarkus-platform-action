@@ -10,22 +10,34 @@
         <debezium.version>2.5.0.Final</debezium.version>
     </properties>
 
-    <platformConfig>
-        <members>
-            <member>
-                <name>Camel</name>
-                <bom>org.apache.camel.quarkus:camel-quarkus-bom:${camel-quarkus.version}</bom>
-            </member>
-            <member>
-                <name>Debezium</name>
-                <dependencyManagement>
-                    <dependency>io.debezium:debezium-core:${debezium.version}</dependency>
-                </dependencyManagement>
-            </member>
-            <member>
-                <name>NoVersion</name>
-                <bom>com.example:no-version-ref:1.0.0</bom>
-            </member>
-        </members>
-    </platformConfig>
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>io.quarkus</groupId>
+                    <artifactId>quarkus-platform-bom-maven-plugin</artifactId>
+                    <configuration>
+                        <platformConfig>
+                            <members>
+                                <member>
+                                    <name>Camel</name>
+                                    <bom>org.apache.camel.quarkus:camel-quarkus-bom:${camel-quarkus.version}</bom>
+                                </member>
+                                <member>
+                                    <name>Debezium</name>
+                                    <dependencyManagement>
+                                        <dependency>io.debezium:debezium-core:${debezium.version}</dependency>
+                                    </dependencyManagement>
+                                </member>
+                                <member>
+                                    <name>NoVersion</name>
+                                    <bom>com.example:no-version-ref:1.0.0</bom>
+                                </member>
+                            </members>
+                        </platformConfig>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>

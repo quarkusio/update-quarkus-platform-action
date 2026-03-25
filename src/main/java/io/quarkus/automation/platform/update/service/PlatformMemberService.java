@@ -34,7 +34,7 @@ public class PlatformMemberService {
         Element properties = root.childElement("properties").orElseThrow(
                 () -> new IllegalStateException("No <properties> element found in pom.xml"));
 
-        Optional<Element> platformConfigOpt = root.childElement("platformConfig");
+        Optional<Element> platformConfigOpt = findPlatformConfig(root);
         if (platformConfigOpt.isEmpty()) {
             LOG.warn("No <platformConfig> element found in pom.xml");
             return List.of();
@@ -125,6 +125,45 @@ public class PlatformMemberService {
 
         editor.setTextContent(versionProp, newVersion);
         Files.writeString(pomPath, editor.toXml());
+    }
+
+    /**
+     * Finds the platformConfig element inside
+     * build > pluginManagement > plugins > plugin(quarkus-platform-bom-maven-plugin) > configuration.
+     */
+    private static Optional<Element> findPlatformConfig(Element root) {
+        Optional<Element> build = root.childElement("build");
+        if (build.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<Element> pluginManagement = build.get().childElement("pluginManagement");
+        if (pluginManagement.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<Element> plugins = pluginManagement.get().childElement("plugins");
+        if (plugins.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<Element> bomPlugin = plugins.get().childElements("plugin")
+                .filter(p -> {
+                    Optional<Element> artifactId = p.childElement("artifactId");
+                    return artifactId.isPresent()
+                            && "quarkus-platform-bom-maven-plugin".equals(artifactId.get().textContentTrimmed());
+                })
+                .findFirst();
+        if (bomPlugin.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<Element> configuration = bomPlugin.get().childElement("configuration");
+        if (configuration.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return configuration.get().childElement("platformConfig");
     }
 
     private static String extractPropertyName(String versionRef) {

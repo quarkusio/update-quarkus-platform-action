@@ -90,6 +90,9 @@ public class UpdatePlatformMembersAction {
             String baseBranch = entry.getKey();
             ResolvedConfig resolvedConfig = entry.getValue();
 
+            commands.notice("Processing branch " + baseBranch + " with " + resolvedConfig.members().size()
+                    + " tracked member(s) (default policy: " + resolvedConfig.defaultUpdatePolicy() + ")");
+
             try {
                 int updates = processBranch(commands, repo, repoDir, baseBranch, resolvedConfig);
                 totalUpdatesCreated += updates;
@@ -261,6 +264,10 @@ public class UpdatePlatformMembersAction {
     private boolean processMember(Commands commands, GHRepository repo, Path repoDir, Path pomPath,
             String baseBranch, PlatformMember member, UpdatePolicy policy) throws Exception {
 
+        commands.notice("Checking " + member.getName() + " (" + member.getGroupId() + ":" + member.getArtifactId()
+                + ") on branch " + baseBranch + " - current version: " + member.getCurrentVersion()
+                + ", policy: " + policy);
+
         // Check Maven Central for latest version matching the policy
         Optional<String> latestOpt = versionResolver.getLatestRelease(member.getGroupId(), member.getArtifactId(),
                 member.getCurrentVersion(), policy);
@@ -272,16 +279,16 @@ public class UpdatePlatformMembersAction {
 
         // Compare versions (getLatestRelease already filters, but double-check)
         if (!versionResolver.isNewer(member.getCurrentVersion(), latestVersion)) {
-            LOG.infof("%s is up to date at %s", member.getName(), member.getCurrentVersion());
+            commands.notice(member.getName() + " is up to date at " + member.getCurrentVersion());
             return false;
         }
 
-        LOG.infof("%s has update available: %s -> %s", member.getName(), member.getCurrentVersion(), latestVersion);
+        commands.notice(member.getName() + " has update available: " + member.getCurrentVersion() + " -> " + latestVersion);
 
         // Check for existing open PR
         String branchName = buildBranchName(baseBranch, member, latestVersion);
         if (pullRequestService.hasOpenPR(repo, branchName)) {
-            LOG.infof("PR already open for %s %s, skipping", member.getName(), latestVersion);
+            commands.notice("PR already open for " + member.getName() + " " + latestVersion + ", skipping");
             return false;
         }
 

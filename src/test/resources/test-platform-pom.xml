@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>io.quarkus.platform</groupId>
+    <artifactId>quarkus-platform</artifactId>
+    <version>999-SNAPSHOT</version>
+
+    <properties>
+        <camel-quarkus.version>3.17.0</camel-quarkus.version>
+        <debezium.version>2.5.0.Final</debezium.version>
+    </properties>
+
+    <platformConfig>
+        <members>
+            <member>
+                <name>Camel</name>
+                <bom>org.apache.camel.quarkus:camel-quarkus-bom:${camel-quarkus.version}</bom>
+            </member>
+            <member>
+                <name>Debezium</name>
+                <dependencyManagement>
+                    <dependency>io.debezium:debezium-core:${debezium.version}</dependency>
+                </dependencyManagement>
+            </member>
+            <member>
+                <name>NoVersion</name>
+                <bom>com.example:no-version-ref:1.0.0</bom>
+            </member>
+        </members>
+    </platformConfig>
+</project>

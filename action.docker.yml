@@ -1,0 +1,9 @@
+name: 'Update Quarkus Platform GitHub Action'
+description: 'Updates Quarkus Platform members'
+inputs:
+  github-token:
+    description: 'GitHub token'
+    required: false
+runs:
+  using: 'docker'
+  image: 'docker://ghcr.io/quarkusio/update-quarkus-platform-action:main'

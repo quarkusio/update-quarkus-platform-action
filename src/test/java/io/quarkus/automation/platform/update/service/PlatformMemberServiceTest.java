@@ -57,6 +57,37 @@ class PlatformMemberServiceTest {
     }
 
     @Test
+    void parseCoreMembersGroupedByVersionProperty() throws IOException {
+        List<PlatformMember> members = service.parseMembers(TEST_POM_PATH);
+
+        // Vault has 3 deps (vault, vault-deployment, vault-model) but should produce one member
+        PlatformMember vault = members.stream()
+                .filter(m -> m.getName().equals("io.quarkiverse.vault"))
+                .findFirst().orElse(null);
+
+        assertThat(vault).isNotNull();
+        assertThat(vault.getGroupId()).isEqualTo("io.quarkiverse.vault");
+        assertThat(vault.getArtifactId()).isEqualTo("quarkus-vault");
+        assertThat(vault.getVersionProperty()).isEqualTo("quarkus-vault.version");
+        assertThat(vault.getCurrentVersion()).isEqualTo("4.7.0");
+    }
+
+    @Test
+    void coreNonDeploymentArtifactPreferred() throws IOException {
+        List<PlatformMember> members = service.parseMembers(TEST_POM_PATH);
+
+        // Qute Web has runtime + deployment, runtime should be picked
+        PlatformMember quteWeb = members.stream()
+                .filter(m -> m.getName().equals("io.quarkiverse.qute.web"))
+                .findFirst().orElse(null);
+
+        assertThat(quteWeb).isNotNull();
+        assertThat(quteWeb.getGroupId()).isEqualTo("io.quarkiverse.qute.web");
+        assertThat(quteWeb.getArtifactId()).isEqualTo("quarkus-qute-web");
+        assertThat(quteWeb.getCurrentVersion()).isEqualTo("3.4.4");
+    }
+
+    @Test
     void updateVersionProperty(@TempDir Path tempDir) throws IOException {
         Path pomPath = tempDir.resolve("pom.xml");
         Files.copy(TEST_POM_PATH, pomPath);

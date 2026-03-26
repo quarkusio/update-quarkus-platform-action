@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,6 +49,9 @@ public class PlatformMemberService {
         }
 
         List<PlatformMember> members = new ArrayList<>();
+
+        // Parse core dependencies (grouped by version property)
+        parseCoreMembers(platformConfigOpt.get(), properties, members);
 
         membersOpt.get().childElements("member").forEach(memberElement -> {
             String name = memberElement.childTextTrimmed("name");
@@ -125,6 +130,61 @@ public class PlatformMemberService {
 
         editor.setTextContent(versionProp, newVersion);
         Files.writeString(pomPath, editor.toXml());
+    }
+
+    /**
+     * Parses dependencies from the core section's dependencyManagement, grouped by version property.
+     * For each unique version property, creates one PlatformMember using the first non-deployment artifact.
+     * The groupId is used as the member name.
+     */
+    private void parseCoreMembers(Element platformConfig, Element properties, List<PlatformMember> members) {
+        Optional<Element> coreOpt = platformConfig.childElement("core");
+        if (coreOpt.isEmpty()) {
+            return;
+        }
+
+        Optional<Element> depMgmtOpt = coreOpt.get().childElement("dependencyManagement");
+        if (depMgmtOpt.isEmpty()) {
+            return;
+        }
+
+        // Group dependencies by version property, keeping insertion order
+        Map<String, String[]> byVersionProperty = new LinkedHashMap<>();
+
+        depMgmtOpt.get().childElements("dependency").forEach(dep -> {
+            String gav = dep.textContentTrimmed();
+            String[] parts = gav.split(":");
+            if (parts.length < 3) {
+                return;
+            }
+
+            String groupId = parts[0];
+            String artifactId = parts[1];
+            String versionPropertyName = extractPropertyName(parts[2]);
+            if (versionPropertyName == null) {
+                return;
+            }
+
+            byVersionProperty.putIfAbsent(versionPropertyName, new String[] { groupId, artifactId });
+        });
+
+        for (Map.Entry<String, String[]> entry : byVersionProperty.entrySet()) {
+            String versionPropertyName = entry.getKey();
+            String[] ga = entry.getValue();
+
+            Optional<Element> propElement = properties.childElement(versionPropertyName);
+            if (propElement.isEmpty()) {
+                LOG.warnf("Could not resolve version property %s for core dependency", versionPropertyName);
+                continue;
+            }
+
+            String currentVersion = propElement.get().textContentTrimmed();
+            if (currentVersion.isEmpty()) {
+                continue;
+            }
+
+            members.add(new PlatformMember(ga[0], ga[0], ga[1], versionPropertyName, currentVersion));
+        }
     }
 
     /**

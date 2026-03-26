@@ -8,6 +8,8 @@
     <properties>
         <camel-quarkus.version>3.17.0</camel-quarkus.version>
         <debezium.version>2.5.0.Final</debezium.version>
+        <quarkus-qute-web.version>3.4.4</quarkus-qute-web.version>
+        <quarkus-vault.version>4.7.0</quarkus-vault.version>
     </properties>
 
     <build>
@@ -18,6 +20,15 @@
                     <artifactId>quarkus-platform-bom-maven-plugin</artifactId>
                     <configuration>
                         <platformConfig>
+                            <core>
+                                <dependencyManagement>
+                                    <dependency>io.quarkiverse.vault:quarkus-vault:${quarkus-vault.version}</dependency>
+                                    <dependency>io.quarkiverse.vault:quarkus-vault-deployment:${quarkus-vault.version}</dependency>
+                                    <dependency>io.quarkiverse.vault:quarkus-vault-model:${quarkus-vault.version}</dependency>
+                                    <dependency>io.quarkiverse.qute.web:quarkus-qute-web:${quarkus-qute-web.version}</dependency>
+                                    <dependency>io.quarkiverse.qute.web:quarkus-qute-web-deployment:${quarkus-qute-web.version}</dependency>
+                                </dependencyManagement>
+                            </core>
                             <members>
                                 <member>
                                     <name>Camel</name>

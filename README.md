@@ -16,6 +16,38 @@ Each branch and member is processed independently: if one fails, the others are 
 
 ## Usage
 
+### 1. Create a GitHub App
+
+A GitHub App token is required (instead of `GITHUB_TOKEN`) so that PRs created by the action trigger CI workflows.
+
+1. Go to your organization's **Settings > Developer settings > GitHub Apps > New GitHub App**
+2. Fill in:
+   - **Name**: e.g. `Quarkus Platform Updater`
+   - **Homepage URL**: the repository URL
+   - **Webhook**: uncheck "Active" (not needed)
+3. Set **Repository permissions**:
+   - **Contents**: Read & write (to push branches)
+   - **Pull requests**: Read & write (to create PRs)
+4. Click **Create GitHub App**
+5. Note the **App ID** displayed on the app's settings page
+6. Under **Private keys**, click **Generate a private key** — a `.pem` file will be downloaded
+
+### 2. Configure repository secrets
+
+In the target repository (e.g. `quarkusio/quarkus-platform`):
+
+1. Go to **Settings > Secrets and variables > Actions**
+2. Add a **secret**: `UPDATE_PLATFORM_APP_ID` with the App ID from step 1
+3. Add a **secret**: `UPDATE_PLATFORM_APP_PRIVATE_KEY` with the contents of the `.pem` file
+
+### 3. Install the GitHub App
+
+1. Go to your GitHub App's settings page
+2. Click **Install App** in the sidebar
+3. Install it on the target repository (e.g. `quarkusio/quarkus-platform`)
+
+### 4. Add the workflow
+
 Add a workflow to your Quarkus Platform repository:
 
 ```yaml
@@ -23,20 +55,24 @@ name: Update Platform Members
 
 on:
   schedule:
-    # Run daily at 6am UTC
     - cron: '0 6 * * *'
   workflow_dispatch:
 
 jobs:
   update:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.UPDATE_PLATFORM_APP_ID }}
+          private-key: ${{ secrets.UPDATE_PLATFORM_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Set up JDK 25
         uses: actions/setup-java@v5
@@ -47,10 +83,10 @@ jobs:
 
       - uses: quarkusio/update-quarkus-platform-action@main
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.app-token.outputs.token }}
 ```
 
-The action runs once and processes all configured branches (main + any branches defined in the config file). `fetch-depth: 0` is required so the action can check out maintenance branches.
+The action runs once and processes all configured branches (main + any branches defined in the config file). `fetch-depth: 0` is required so the action can check out maintenance branches. The app token is also passed to `actions/checkout` so that git push uses it.
 
 ## Configuration
 

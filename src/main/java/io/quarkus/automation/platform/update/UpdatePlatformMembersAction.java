@@ -97,7 +97,7 @@ public class UpdatePlatformMembersAction {
                 int updates = processBranch(commands, repo, repoDir, baseBranch, resolvedConfig);
                 totalUpdatesCreated += updates;
             } catch (Exception e) {
-                commands.warning("Failed to process branch " + baseBranch + ": " + e.getMessage());
+                commands.error("Failed to process branch " + baseBranch + ": " + e.getMessage());
                 LOG.error("Failed to process branch " + baseBranch, e);
             }
 
@@ -244,7 +244,7 @@ public class UpdatePlatformMembersAction {
                     updatesCreated++;
                 }
             } catch (Exception e) {
-                commands.warning("Failed to process member " + member.getName()
+                commands.error("Failed to process member " + member.getName()
                         + " on branch " + baseBranch + ": " + e.getMessage());
                 LOG.error("Failed to process member " + member.getName() + " on branch " + baseBranch, e);
                 // Reset to clean state and continue with next member

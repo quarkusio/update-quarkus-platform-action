@@ -37,7 +37,7 @@ runs:
       uses: jbangdev/setup-jbang@main
     - name: Run the action
       id: action
-      run: jbang --java 25 --fresh --repos 'quarkus-github-action=https://maven.pkg.github.com/quarkusio/update-quarkus-platform-action/' --repos 'mavencentral' io.quarkus.automation:update-quarkus-platform-action:999-SNAPSHOT
+      run: jbang --verbose --java 25 --fresh --repos 'quarkus-github-action=https://maven.pkg.github.com/quarkusio/update-quarkus-platform-action/' --repos 'mavencentral' io.quarkus.automation:update-quarkus-platform-action:999-SNAPSHOT
       shell: bash
       env:
         JSON_INPUTS: ${{ toJSON(inputs) }}

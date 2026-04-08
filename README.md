@@ -173,6 +173,29 @@ If both an exact branch entry and `latest` resolve to the same branch, the exact
 
 `latest` automatically resolves to the newest branch matching the `X.Y` format (e.g. if branches `3.31`, `3.32`, `3.33` exist, `latest` resolves to `3.33`). This is useful so you don't have to update the config file every time a new maintenance branch is created.
 
+### Notifications
+
+You can configure GitHub handles to be notified (via `/cc` in the PR description) when a PR is created for a specific member. This is defined in a top-level `notifications` section, separate from branch configs, so it only needs to be specified once:
+
+```yaml
+notifications:
+  - member: Camel
+    notify: [githubhandle1, githubhandle2]
+  - member: CXF
+    notify: [githubhandle3]
+
+members:
+  - name: Camel
+  - name: CXF
+
+branches:
+  latest:
+    members:
+      - name: Camel
+```
+
+When a PR is created for Camel (on any branch), the PR description will include `/cc @githubhandle1 @githubhandle2`. The `notifications` section is optional — members without a notification entry will simply not have a `/cc` line.
+
 ## Pull requests
 
 - **Branch naming**: `update-automation/{base-branch}-{member-name}-{version}` (e.g. `update-automation/main-camel-3.18.0`)

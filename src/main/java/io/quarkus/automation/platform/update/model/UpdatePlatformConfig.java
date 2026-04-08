@@ -16,6 +16,8 @@ public class UpdatePlatformConfig {
 
     private Map<String, BranchConfig> branches;
 
+    private List<NotificationConfig> notifications;
+
     public UpdatePolicy getDefaultUpdatePolicy() {
         return defaultUpdatePolicy;
     }
@@ -38,5 +40,13 @@ public class UpdatePlatformConfig {
 
     public void setBranches(Map<String, BranchConfig> branches) {
         this.branches = branches;
+    }
+
+    public List<NotificationConfig> getNotifications() {
+        return notifications;
+    }
+
+    public void setNotifications(List<NotificationConfig> notifications) {
+        this.notifications = notifications;
     }
 }

@@ -152,6 +152,39 @@
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.7.3</version>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <pomElements>
+                        <description>keep</description>
+                        <url>keep</url>
+                        <developers>keep</developers>
+                        <scm>keep</scm>
+                        <issueManagement>keep</issueManagement>
+                        <repositories>remove</repositories>
+                        <dependencies>remove</dependencies>
+                        <build>remove</build>
+                    </pomElements>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
@@ -168,52 +201,6 @@
                 <skipITs>false</skipITs>
                 <quarkus.native.enabled>true</quarkus.native.enabled>
             </properties>
-        </profile>
-        <profile>
-            <id>flatten</id>
-            <activation>
-                <property>
-                    <name>quarkus.package.jar.type</name>
-                    <value>uber-jar</value>
-                </property>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>flatten-maven-plugin</artifactId>
-                        <version>1.7.3</version>
-                        <executions>
-                            <execution>
-                                <id>flatten</id>
-                                <phase>process-resources</phase>
-                                <goals>
-                                    <goal>flatten</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>flatten.clean</id>
-                                <phase>clean</phase>
-                                <goals>
-                                    <goal>clean</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <pomElements>
-                                <description>keep</description>
-                                <url>keep</url>
-                                <developers>keep</developers>
-                                <scm>keep</scm>
-                                <issueManagement>keep</issueManagement>
-                                <repositories>remove</repositories>
-                                <dependencies>remove</dependencies>
-                                <build>remove</build>
-                            </pomElements>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
         </profile>
         <profile>
             <id>github-action</id>

@@ -27,6 +27,7 @@ import io.quarkiverse.githubaction.ConfigFile;
 import io.quarkiverse.githubaction.Context;
 import io.quarkus.automation.platform.update.model.BranchConfig;
 import io.quarkus.automation.platform.update.model.MemberConfig;
+import io.quarkus.automation.platform.update.model.NotificationConfig;
 import io.quarkus.automation.platform.update.model.PlatformMember;
 import io.quarkus.automation.platform.update.model.UpdatePlatformConfig;
 import io.quarkus.automation.platform.update.model.UpdatePolicy;
@@ -84,6 +85,9 @@ public class UpdatePlatformMembersAction {
             return;
         }
 
+        // Build notifications lookup: member name -> list of GitHub handles
+        Map<String, List<String>> notificationsMap = buildNotificationsMap(config.getNotifications());
+
         int totalUpdatesCreated = 0;
 
         for (Map.Entry<String, ResolvedConfig> entry : branchesToProcess.entrySet()) {
@@ -94,7 +98,7 @@ public class UpdatePlatformMembersAction {
                     + " tracked member(s) (default policy: " + resolvedConfig.defaultUpdatePolicy() + ")");
 
             try {
-                int updates = processBranch(commands, repo, repoDir, baseBranch, resolvedConfig);
+                int updates = processBranch(commands, repo, repoDir, baseBranch, resolvedConfig, notificationsMap);
                 totalUpdatesCreated += updates;
             } catch (Exception e) {
                 commands.error("Failed to process branch " + baseBranch + ": " + e.getMessage());
@@ -203,7 +207,7 @@ public class UpdatePlatformMembersAction {
     }
 
     private int processBranch(Commands commands, GHRepository repo, Path repoDir,
-            String baseBranch, ResolvedConfig resolvedConfig) throws Exception {
+            String baseBranch, ResolvedConfig resolvedConfig, Map<String, List<String>> notificationsMap) throws Exception {
 
         // Checkout the target branch
         gitService.checkout(repoDir, baseBranch);
@@ -238,8 +242,9 @@ public class UpdatePlatformMembersAction {
                 UpdatePolicy effectivePolicy = memberConfig.getUpdatePolicy() != null
                         ? memberConfig.getUpdatePolicy()
                         : defaultPolicy;
+                List<String> notify = notificationsMap.getOrDefault(member.getName(), List.of());
                 boolean created = processMember(commands, repo, repoDir, pomPath, baseBranch, member,
-                        effectivePolicy);
+                        effectivePolicy, notify);
                 if (created) {
                     updatesCreated++;
                 }
@@ -262,7 +267,7 @@ public class UpdatePlatformMembersAction {
     }
 
     private boolean processMember(Commands commands, GHRepository repo, Path repoDir, Path pomPath,
-            String baseBranch, PlatformMember member, UpdatePolicy policy) throws Exception {
+            String baseBranch, PlatformMember member, UpdatePolicy policy, List<String> notify) throws Exception {
 
         commands.notice("Checking " + member.getName() + " (" + member.getGroupId() + ":" + member.getArtifactId()
                 + ") on branch " + baseBranch + " - current version: " + member.getCurrentVersion()
@@ -310,7 +315,7 @@ public class UpdatePlatformMembersAction {
         gitService.push(repoDir, branchName);
 
         // Create PR
-        GHPullRequest pr = pullRequestService.createPullRequest(repo, branchName, baseBranch, member, latestVersion);
+        GHPullRequest pr = pullRequestService.createPullRequest(repo, branchName, baseBranch, member, latestVersion, notify);
         commands.notice("Created PR #" + pr.getNumber() + " for " + member.getName() + " " + latestVersion);
 
         return true;
@@ -321,6 +326,15 @@ public class UpdatePlatformMembersAction {
                 + baseBranch + "-"
                 + member.getName().toLowerCase(Locale.ROOT).replace(" ", "-")
                 + "-" + newVersion;
+    }
+
+    static Map<String, List<String>> buildNotificationsMap(List<NotificationConfig> notifications) {
+        if (notifications == null || notifications.isEmpty()) {
+            return Map.of();
+        }
+        return notifications.stream()
+                .filter(n -> n.getMember() != null && n.getNotify() != null && !n.getNotify().isEmpty())
+                .collect(Collectors.toMap(NotificationConfig::getMember, NotificationConfig::getNotify));
     }
 
     record ResolvedConfig(List<MemberConfig> members, UpdatePolicy defaultUpdatePolicy) {

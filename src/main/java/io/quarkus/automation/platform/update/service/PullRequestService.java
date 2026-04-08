@@ -1,6 +1,7 @@
 package io.quarkus.automation.platform.update.service;
 
 import java.io.IOException;
+import java.util.List;
 
 import jakarta.inject.Singleton;
 
@@ -26,15 +27,15 @@ public class PullRequestService {
     }
 
     public GHPullRequest createPullRequest(GHRepository repo, String branchName, String baseBranch,
-            PlatformMember member, String newVersion) throws IOException {
+            PlatformMember member, String newVersion, List<String> notify) throws IOException {
         String title = "Update " + member.getName() + " to " + newVersion;
-        String body = buildPRBody(member, newVersion);
+        String body = buildPRBody(member, newVersion, notify);
 
         LOG.infof("Creating PR: %s", title);
         return repo.createPullRequest(title, branchName, baseBranch, body);
     }
 
-    private String buildPRBody(PlatformMember member, String newVersion) {
+    private String buildPRBody(PlatformMember member, String newVersion, List<String> notify) {
         StringBuilder sb = new StringBuilder();
         sb.append("Updates the Quarkus Platform member **").append(member.getName()).append("**");
         sb.append(" from `").append(member.getCurrentVersion()).append("`");
@@ -48,6 +49,15 @@ public class PullRequestService {
         sb.append("- `").append(member.getGroupId()).append(":").append(member.getArtifactId()).append("`\n\n");
         sb.append("---\n");
         sb.append("*This PR was automatically created by the Update Quarkus Platform Action.*\n");
+
+        if (notify != null && !notify.isEmpty()) {
+            sb.append("\n/cc");
+            for (String handle : notify) {
+                sb.append(" @").append(handle);
+            }
+            sb.append("\n");
+        }
+
         return sb.toString();
     }
 }

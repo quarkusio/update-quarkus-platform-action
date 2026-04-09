@@ -19,7 +19,7 @@
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.5.5</surefire-plugin.version>
         <quarkus-github-action.version>2.10.0</quarkus-github-action.version>
-        <domtrip-maven.version>1.0.0</domtrip-maven.version>
+        <domtrip-maven.version>1.1.0</domtrip-maven.version>
         <assertj-core.version>3.27.7</assertj-core.version>
         <mockito-core.version>5.23.0</mockito-core.version>
         <install-plugin.version>3.1.4</install-plugin.version>

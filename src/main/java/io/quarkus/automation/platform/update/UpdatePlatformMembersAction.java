@@ -77,6 +77,14 @@ public class UpdatePlatformMembersAction {
         // Configure git user
         gitService.configureGitUser(repoDir, GIT_USER_NAME, GIT_USER_EMAIL);
 
+        // Clean up stale branches before processing
+        try {
+            pullRequestService.cleanupStaleBranches(repo, commands);
+        } catch (Exception e) {
+            commands.warning("Branch cleanup failed: " + e.getMessage());
+            LOG.error("Branch cleanup failed", e);
+        }
+
         // Build the map of branches to process with their resolved configs
         Map<String, ResolvedConfig> branchesToProcess = resolveBranches(config, defaultBranch, repo);
 

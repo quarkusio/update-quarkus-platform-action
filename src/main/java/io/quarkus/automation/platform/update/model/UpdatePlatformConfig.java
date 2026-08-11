@@ -12,6 +12,8 @@ public class UpdatePlatformConfig {
     @JsonProperty("default-update-policy")
     private UpdatePolicy defaultUpdatePolicy;
 
+    private Integer delay;
+
     private List<MemberConfig> members;
 
     private Map<String, BranchConfig> branches;
@@ -20,6 +22,14 @@ public class UpdatePlatformConfig {
 
     public UpdatePolicy getDefaultUpdatePolicy() {
         return defaultUpdatePolicy;
+    }
+
+    public Integer getDelay() {
+        return delay;
+    }
+
+    public void setDelay(Integer delay) {
+        this.delay = delay;
     }
 
     public void setDefaultUpdatePolicy(UpdatePolicy defaultUpdatePolicy) {

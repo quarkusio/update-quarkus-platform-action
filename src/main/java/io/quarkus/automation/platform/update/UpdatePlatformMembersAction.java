@@ -2,6 +2,8 @@ package io.quarkus.automation.platform.update;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -137,9 +139,10 @@ public class UpdatePlatformMembersAction {
 
         // Default branch uses root config
         if (config.getMembers() != null && !config.getMembers().isEmpty()) {
-            result.put(defaultBranch, new ResolvedConfig(
+            result.put(defaultBranch, ResolvedConfig.of(
                     config.getMembers(),
-                    config.getDefaultUpdatePolicy() != null ? config.getDefaultUpdatePolicy() : UpdatePolicy.ANY));
+                    config.getDefaultUpdatePolicy(),
+                    config.getDelay()));
         }
 
         Map<String, BranchConfig> branches = config.getBranches();
@@ -169,11 +172,10 @@ public class UpdatePlatformMembersAction {
                 continue;
             }
 
-            result.put(key, new ResolvedConfig(
+            result.put(key, ResolvedConfig.of(
                     branchConfig.getMembers(),
-                    branchConfig.getDefaultUpdatePolicy() != null
-                            ? branchConfig.getDefaultUpdatePolicy()
-                            : UpdatePolicy.ANY));
+                    branchConfig.getDefaultUpdatePolicy(),
+                    config.getDelay()));
         }
 
         // Process 'latest' pseudo-branch last so exact matches take priority
@@ -182,11 +184,10 @@ public class UpdatePlatformMembersAction {
             if (latestConfig.getMembers() == null || latestConfig.getMembers().isEmpty()) {
                 LOG.warnf("No members configured for branch %s (latest), skipping", latestBranchName);
             } else {
-                result.put(latestBranchName, new ResolvedConfig(
+                result.put(latestBranchName, ResolvedConfig.of(
                         latestConfig.getMembers(),
-                        latestConfig.getDefaultUpdatePolicy() != null
-                                ? latestConfig.getDefaultUpdatePolicy()
-                                : UpdatePolicy.ANY));
+                        latestConfig.getDefaultUpdatePolicy(),
+                        config.getDelay()));
             }
         }
 
@@ -244,22 +245,50 @@ public class UpdatePlatformMembersAction {
         int updatesCreated = 0;
         UpdatePolicy defaultPolicy = resolvedConfig.defaultUpdatePolicy();
 
+        List<VersionUpdate> versionUpdates = new ArrayList<>();
         for (PlatformMember member : trackedMembers) {
+            MemberConfig memberConfig = memberConfigs.get(member.getName());
+            UpdatePolicy effectivePolicy = memberConfig.getUpdatePolicy() != null
+                    ? memberConfig.getUpdatePolicy()
+                    : defaultPolicy;
+            List<String> notify = notificationsMap.getOrDefault(member.getName(), List.of());
+
             try {
-                MemberConfig memberConfig = memberConfigs.get(member.getName());
-                UpdatePolicy effectivePolicy = memberConfig.getUpdatePolicy() != null
-                        ? memberConfig.getUpdatePolicy()
-                        : defaultPolicy;
-                List<String> notify = notificationsMap.getOrDefault(member.getName(), List.of());
-                boolean created = processMember(commands, repo, repoDir, pomPath, baseBranch, member,
+                Optional<VersionUpdate> versionUpdate = checkMemberUpdate(commands, repo, baseBranch, member,
                         effectivePolicy, notify);
+                if (versionUpdate.isPresent()) {
+                    versionUpdates.add(versionUpdate.get());
+                }
+            } catch (Exception e) {
+                commands.error("Failed to check update for member " + member.getName()
+                        + " on branch " + baseBranch + ": " + e.getMessage());
+            }
+        }
+
+        if (versionUpdates.isEmpty()) {
+            return 0;
+        }
+
+        // Wait before creating the pull requests, in case a sync is still ongoing
+        if (resolvedConfig.delay() > 0) {
+            try {
+                Thread.sleep(Duration.ofMinutes(resolvedConfig.delay()));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LOG.warn("Sleep interrupted, proceeding with PR creation");
+            }
+        }
+
+        for (VersionUpdate versionUpdate : versionUpdates) {
+            try {
+                boolean created = createPullRequest(commands, repo, repoDir, pomPath, baseBranch, versionUpdate);
                 if (created) {
                     updatesCreated++;
                 }
             } catch (Exception e) {
-                commands.error("Failed to process member " + member.getName()
+                commands.error("Failed to create pull request for member " + versionUpdate.platformMember().getName()
                         + " on branch " + baseBranch + ": " + e.getMessage());
-                LOG.error("Failed to process member " + member.getName() + " on branch " + baseBranch, e);
+                LOG.error("Failed to create pull request for member " + versionUpdate.platformMember().getName() + " on branch " + baseBranch, e);
                 // Reset to clean state and continue with next member
                 try {
                     gitService.checkout(repoDir, baseBranch);
@@ -274,57 +303,65 @@ public class UpdatePlatformMembersAction {
         return updatesCreated;
     }
 
-    private boolean processMember(Commands commands, GHRepository repo, Path repoDir, Path pomPath,
-            String baseBranch, PlatformMember member, UpdatePolicy policy, List<String> notify) throws Exception {
-
+    private Optional<VersionUpdate> checkMemberUpdate(Commands commands, GHRepository repo,
+                                                      String baseBranch, PlatformMember member, UpdatePolicy policy, List<String> notify) {
         commands.notice("Checking " + member.getName() + " (" + member.getGroupId() + ":" + member.getArtifactId()
                 + ") on branch " + baseBranch + " - current version: " + member.getCurrentVersion()
                 + ", policy: " + policy);
 
         // Check Maven Central for latest version matching the policy
-        Optional<String> latestOpt = versionResolver.getLatestRelease(member.getGroupId(), member.getArtifactId(),
+        Optional<String> latestVersion = versionResolver.getLatestRelease(member.getGroupId(), member.getArtifactId(),
                 member.getCurrentVersion(), policy);
-        if (latestOpt.isEmpty()) {
+        if (latestVersion.isEmpty()) {
             commands.notice(member.getName() + " is up to date at " + member.getCurrentVersion());
-            return false;
+            return Optional.empty();
         }
-        String latestVersion = latestOpt.get();
 
-        commands.notice(member.getName() + " has update available: " + member.getCurrentVersion() + " -> " + latestVersion);
+        commands.notice(member.getName() + " has update available: " + member.getCurrentVersion() + " -> " + latestVersion.get());
 
         // Check for existing open PR
-        String branchName = buildBranchName(baseBranch, member, latestVersion);
-        if (pullRequestService.hasOpenPR(repo, branchName)) {
-            commands.notice("PR already open for " + member.getName() + " " + latestVersion + ", skipping");
-            return false;
+        String branchName = buildBranchName(baseBranch, member, latestVersion.get());
+        try {
+            if (pullRequestService.hasOpenPR(repo, branchName)) {
+                commands.notice("PR already open for " + member.getName() + " " + latestVersion.get() + ", skipping");
+                return Optional.empty();
+            }
+        } catch (IOException e) {
+            commands.error("Unable to check for open PR for " + member.getName() + " " + latestVersion.get() + ", opening PR anyway");
+            LOG.warn("Unable to check for open PR for " + member.getName(), e);
         }
 
+        return Optional.of(new VersionUpdate(member, latestVersion.get(), branchName, notify));
+    }
+
+    private boolean createPullRequest(Commands commands, GHRepository repo, Path repoDir, Path pomPath,
+                                      String baseBranch, VersionUpdate versionUpdate) throws Exception {
         // Ensure we are on the base branch, clean
         gitService.checkout(repoDir, baseBranch);
         gitService.resetHard(repoDir, "origin/" + baseBranch);
         gitService.clean(repoDir);
 
         // Create branch
-        gitService.createBranch(repoDir, branchName);
+        gitService.createBranch(repoDir, versionUpdate.branchName());
 
         // Update version property in pom.xml
-        platformMemberService.updateVersionProperty(pomPath, member.getVersionProperty(), latestVersion);
+        platformMemberService.updateVersionProperty(pomPath, versionUpdate.platformMember().getVersionProperty(), versionUpdate.newVersion());
 
         // Run ./mvnw -Dsync
         int syncResult = processes.execute(List.of("./mvnw", "-B", "--no-transfer-progress", "-Dsync"), repoDir);
         if (syncResult != 0) {
-            throw new RuntimeException("./mvnw -Dsync failed for " + member.getName() + " with exit code " + syncResult);
+            throw new RuntimeException("./mvnw -Dsync failed for " + versionUpdate.platformMember().getName() + " with exit code " + syncResult);
         }
 
         // Stage, commit, push
         gitService.addAll(repoDir);
-        String commitMsg = "Update " + member.getName() + " to " + latestVersion;
+        String commitMsg = "Update " + versionUpdate.platformMember().getName() + " to " + versionUpdate.newVersion();
         gitService.commit(repoDir, commitMsg);
-        gitService.push(repoDir, branchName);
+        gitService.push(repoDir, versionUpdate.branchName());
 
         // Create PR
-        GHPullRequest pr = pullRequestService.createPullRequest(repo, branchName, baseBranch, member, latestVersion, notify);
-        commands.notice("Created PR #" + pr.getNumber() + " for " + member.getName() + " " + latestVersion);
+        GHPullRequest pr = pullRequestService.createPullRequest(repo, versionUpdate.branchName(), baseBranch, versionUpdate.platformMember(), versionUpdate.newVersion(), versionUpdate.notifications());
+        commands.notice("Created PR #" + pr.getNumber() + " for " + versionUpdate.platformMember().getName() + " " + versionUpdate.newVersion());
 
         return true;
     }
@@ -345,6 +382,18 @@ public class UpdatePlatformMembersAction {
                 .collect(Collectors.toMap(NotificationConfig::getMember, NotificationConfig::getNotify));
     }
 
-    record ResolvedConfig(List<MemberConfig> members, UpdatePolicy defaultUpdatePolicy) {
+    record ResolvedConfig(List<MemberConfig> members, UpdatePolicy defaultUpdatePolicy, int delay) {
+
+        private static final int DEFAULT_DELAY = 10;
+
+        static ResolvedConfig of(List<MemberConfig> members, UpdatePolicy defaultUpdatePolicy, Integer delay) {
+            return new ResolvedConfig(
+                    members,
+                    defaultUpdatePolicy != null ? defaultUpdatePolicy : UpdatePolicy.ANY,
+                    delay == null ? DEFAULT_DELAY : Math.max(0, delay));
+        }
+    }
+
+    private record VersionUpdate(PlatformMember platformMember, String newVersion, String branchName, List<String> notifications) {
     }
 }

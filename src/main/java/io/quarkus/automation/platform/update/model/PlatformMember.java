@@ -1,5 +1,7 @@
 package io.quarkus.automation.platform.update.model;
 
+import java.util.Objects;
+
 public class PlatformMember {
 
     private final String name;
@@ -9,7 +11,7 @@ public class PlatformMember {
     private final String currentVersion;
 
     public PlatformMember(String name, String groupId, String artifactId, String versionProperty, String currentVersion) {
-        this.name = name;
+        this.name = Objects.requireNonNull(name, "name must not be null");
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.versionProperty = versionProperty;
@@ -34,6 +36,21 @@ public class PlatformMember {
 
     public String getCurrentVersion() {
         return currentVersion;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        PlatformMember that = (PlatformMember) o;
+        return name.equals(that.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return name.hashCode();
     }
 
     @Override

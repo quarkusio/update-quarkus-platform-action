@@ -35,8 +35,10 @@ public class VersionResolver {
     }
 
     /**
-     * Find the latest final version that is newer than currentVersion and matches the given policy.
-     * Only considers final versions (no alphas, betas, milestones, RCs, or snapshots).
+     * Find the latest version that is newer than currentVersion and matches the given policy.
+     * If the current version is final, only final candidates are considered.
+     * If the current version is non-final (e.g. Beta2), candidates with the same numeric base
+     * that are newer (e.g. Beta3, CR1, or the final release) are also considered.
      */
     public Optional<String> getLatestRelease(String groupId, String artifactId, String currentVersion,
             UpdatePolicy policy) {
@@ -73,9 +75,13 @@ public class VersionResolver {
             // For ANY policy, try the <release> shortcut first (it's usually a final version)
             if (policy == UpdatePolicy.ANY) {
                 Optional<String> releaseVersion = extractReleaseVersion(versioning.get(), groupId, artifactId);
-                if (releaseVersion.isPresent() && isFinalVersion(releaseVersion.get())
-                        && isNewer(currentVersion, releaseVersion.get())) {
-                    return releaseVersion;
+                if (releaseVersion.isPresent() && isNewer(currentVersion, releaseVersion.get())) {
+                    String rel = releaseVersion.get();
+                    boolean currentIsFinal = isFinalVersion(currentVersion);
+                    if (isFinalVersion(rel)
+                            || (!currentIsFinal && extractNumericBase(currentVersion).equals(extractNumericBase(rel)))) {
+                        return releaseVersion;
+                    }
                 }
                 // If <release> is not final or not newer, fall through to scanning all versions
             }
@@ -159,8 +165,11 @@ public class VersionResolver {
         String bestVersion = null;
         ComparableVersion bestComparable = null;
 
+        boolean currentIsFinal = isFinalVersion(currentVersion);
+        String currentBase = extractNumericBase(currentVersion);
+
         for (String candidate : allVersions) {
-            if (!isFinalVersion(candidate)) {
+            if (!isFinalVersion(candidate) && (currentIsFinal || !currentBase.equals(extractNumericBase(candidate)))) {
                 continue;
             }
 
@@ -196,7 +205,7 @@ public class VersionResolver {
         return new ComparableVersion(version).compareTo(new ComparableVersion(numericBase)) >= 0;
     }
 
-    private static String extractNumericBase(String version) {
+    static String extractNumericBase(String version) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < version.length(); i++) {
             char c = version.charAt(i);

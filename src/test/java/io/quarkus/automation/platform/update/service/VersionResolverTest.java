@@ -97,4 +97,39 @@ class VersionResolverTest {
     void microPolicyRejectsDifferentMajor() {
         assertThat(resolver.matchesPolicy("3.17.0", "4.17.0", UpdatePolicy.MICRO)).isFalse();
     }
+
+    @Test
+    void isFinalVersionDetectsNonFinal() {
+        assertThat(VersionResolver.isFinalVersion("4.0.0.Beta2")).isFalse();
+        assertThat(VersionResolver.isFinalVersion("4.0.0.CR1")).isFalse();
+        assertThat(VersionResolver.isFinalVersion("4.0.0")).isTrue();
+        assertThat(VersionResolver.isFinalVersion("4.0.0.Final")).isTrue();
+    }
+
+    @Test
+    void isEligibleUpgradeFromNonFinalToNewerNonFinalSameBase() {
+        // Beta2 -> Beta3: same base, newer
+        assertThat(resolver.isNewer("4.0.0.Beta2", "4.0.0.Beta3")).isTrue();
+        // Beta2 -> CR1: same base, newer qualifier family
+        assertThat(resolver.isNewer("4.0.0.Beta2", "4.0.0.CR1")).isTrue();
+        // Beta2 -> final: same base, final
+        assertThat(resolver.isNewer("4.0.0.Beta2", "4.0.0")).isTrue();
+        assertThat(resolver.isNewer("4.0.0.Beta2", "4.0.0.Final")).isTrue();
+    }
+
+    @Test
+    void nonFinalCurrentShouldNotUpgradeToDifferentBaseNonFinal() {
+        // 4.0.0.Beta2 -> 4.1.0.Beta1: different base, should not be eligible
+        // (isNewer is true, but the filtering logic in findBestMatchingVersion rejects it)
+        assertThat(VersionResolver.isFinalVersion("4.1.0.Beta1")).isFalse();
+        assertThat(VersionResolver.extractNumericBase("4.0.0.Beta2"))
+                .isNotEqualTo(VersionResolver.extractNumericBase("4.1.0.Beta1"));
+    }
+
+    @Test
+    void finalCurrentShouldNotUpgradeToNonFinal() {
+        // A member on 3.17.0 should not be offered 3.17.1-beta1
+        assertThat(VersionResolver.isFinalVersion("3.17.0")).isTrue();
+        assertThat(VersionResolver.isFinalVersion("3.17.1.Beta1")).isFalse();
+    }
 }

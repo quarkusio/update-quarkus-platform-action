@@ -27,6 +27,14 @@ public class PlatformMemberService {
 
     private static final Pattern PROPERTY_REFERENCE_PATTERN = Pattern.compile("\\$\\{(.+?)}");
 
+    /**
+     * Name of the pseudo-member representing the platform BOM generator (the {@code quarkus-platform-bom-maven-plugin}).
+     * Updating it requires a sync, so it is handled like a regular member.
+     */
+    public static final String BOM_GENERATOR_MEMBER_NAME = "quarkus-platform-bom-generator";
+
+    private static final String BOM_PLUGIN_ARTIFACT_ID = "quarkus-platform-bom-maven-plugin";
+
     public List<PlatformMember> parseMembers(Path pomPath) throws IOException {
         String pomContent = Files.readString(pomPath);
         Document doc = Document.of(pomContent);
@@ -36,7 +44,10 @@ public class PlatformMemberService {
         Element properties = root.childElement("properties").orElseThrow(
                 () -> new IllegalStateException("No <properties> element found in pom.xml"));
 
-        Optional<Element> platformConfigOpt = findPlatformConfig(root);
+        Optional<Element> bomPluginOpt = findBomPlugin(root);
+        Optional<Element> platformConfigOpt = bomPluginOpt
+                .flatMap(p -> p.childElement("configuration"))
+                .flatMap(c -> c.childElement("platformConfig"));
         if (platformConfigOpt.isEmpty()) {
             LOG.warn("No <platformConfig> element found in pom.xml");
             return List.of();
@@ -113,6 +124,8 @@ public class PlatformMemberService {
             members.add(new PlatformMember(name, groupId, artifactId, versionPropertyName, currentVersion));
         });
 
+        parseBomGeneratorMember(bomPluginOpt.get(), properties, members);
+
         return members;
     }
 
@@ -188,10 +201,40 @@ public class PlatformMemberService {
     }
 
     /**
-     * Finds the platformConfig element inside
-     * build > pluginManagement > plugins > plugin(quarkus-platform-bom-maven-plugin) > configuration.
+     * Adds a pseudo-member for the platform BOM generator, based on the version of the
+     * {@code quarkus-platform-bom-maven-plugin}, if it is defined through a property.
      */
-    private static Optional<Element> findPlatformConfig(Element root) {
+    private void parseBomGeneratorMember(Element bomPlugin, Element properties, List<PlatformMember> members) {
+        String groupId = bomPlugin.childTextTrimmed("groupId");
+        String version = bomPlugin.childTextTrimmed("version");
+        if (groupId == null || groupId.isEmpty() || version == null || version.isEmpty()) {
+            LOG.debugf("No groupId or version defined for %s, skipping BOM generator update", BOM_PLUGIN_ARTIFACT_ID);
+            return;
+        }
+
+        String versionPropertyName = extractPropertyName(version);
+        if (versionPropertyName == null) {
+            LOG.debugf("Version of %s is not defined through a property, skipping BOM generator update",
+                    BOM_PLUGIN_ARTIFACT_ID);
+            return;
+        }
+
+        Optional<Element> propElement = properties.childElement(versionPropertyName);
+        String currentVersion = propElement.map(Element::textContentTrimmed).orElse(null);
+        if (currentVersion == null || currentVersion.isEmpty()) {
+            LOG.warnf("Could not resolve version property %s for %s", versionPropertyName, BOM_PLUGIN_ARTIFACT_ID);
+            return;
+        }
+
+        members.add(new PlatformMember(BOM_GENERATOR_MEMBER_NAME, groupId, BOM_PLUGIN_ARTIFACT_ID, versionPropertyName,
+                currentVersion));
+    }
+
+    /**
+     * Finds the quarkus-platform-bom-maven-plugin element inside
+     * build > pluginManagement > plugins.
+     */
+    private static Optional<Element> findBomPlugin(Element root) {
         Optional<Element> build = root.childElement("build");
         if (build.isEmpty()) {
             return Optional.empty();
@@ -211,19 +254,10 @@ public class PlatformMemberService {
                 .filter(p -> {
                     Optional<Element> artifactId = p.childElement("artifactId");
                     return artifactId.isPresent()
-                            && "quarkus-platform-bom-maven-plugin".equals(artifactId.get().textContentTrimmed());
+                            && BOM_PLUGIN_ARTIFACT_ID.equals(artifactId.get().textContentTrimmed());
                 })
                 .findFirst();
-        if (bomPlugin.isEmpty()) {
-            return Optional.empty();
-        }
-
-        Optional<Element> configuration = bomPlugin.get().childElement("configuration");
-        if (configuration.isEmpty()) {
-            return Optional.empty();
-        }
-
-        return configuration.get().childElement("platformConfig");
+        return bomPlugin;
     }
 
     private static String extractPropertyName(String versionRef) {

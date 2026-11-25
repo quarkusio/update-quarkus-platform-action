@@ -10,6 +10,7 @@
         <debezium.version>2.5.0.Final</debezium.version>
         <quarkus-qute-web.version>3.4.4</quarkus-qute-web.version>
         <quarkus-vault.version>4.7.0</quarkus-vault.version>
+        <quarkus-platform-bom-generator.version>0.0.136</quarkus-platform-bom-generator.version>
     </properties>
 
     <build>
@@ -18,6 +19,7 @@
                 <plugin>
                     <groupId>io.quarkus</groupId>
                     <artifactId>quarkus-platform-bom-maven-plugin</artifactId>
+                    <version>${quarkus-platform-bom-generator.version}</version>
                     <configuration>
                         <platformConfig>
                             <core>

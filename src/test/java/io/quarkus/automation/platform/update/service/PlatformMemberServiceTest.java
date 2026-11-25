@@ -88,6 +88,21 @@ class PlatformMemberServiceTest {
     }
 
     @Test
+    void parseBomGeneratorMember() throws IOException {
+        List<PlatformMember> members = service.parseMembers(TEST_POM_PATH);
+
+        PlatformMember bomGenerator = members.stream()
+                .filter(m -> m.getName().equals(PlatformMemberService.BOM_GENERATOR_MEMBER_NAME))
+                .findFirst().orElse(null);
+
+        assertThat(bomGenerator).isNotNull();
+        assertThat(bomGenerator.getGroupId()).isEqualTo("io.quarkus");
+        assertThat(bomGenerator.getArtifactId()).isEqualTo("quarkus-platform-bom-maven-plugin");
+        assertThat(bomGenerator.getVersionProperty()).isEqualTo("quarkus-platform-bom-generator.version");
+        assertThat(bomGenerator.getCurrentVersion()).isEqualTo("0.0.136");
+    }
+
+    @Test
     void updateVersionProperty(@TempDir Path tempDir) throws IOException {
         Path pomPath = tempDir.resolve("pom.xml");
         Files.copy(TEST_POM_PATH, pomPath);

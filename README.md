@@ -102,6 +102,20 @@ members:
 ```
 
 Member names must match the `<name>` element in `platformConfig/members` in the platform `pom.xml`.
+For members defined in `platformConfig/core`, the name is the `groupId` of the dependencies (e.g. `io.quarkiverse.vault`).
+
+### Platform BOM generator
+
+The platform BOM generator (`io.quarkus:quarkus-platform-bom-maven-plugin`) also requires running `./mvnw -Dsync` when it is updated.
+It can be tracked like any other member using the special `quarkus-platform-bom-generator` name:
+
+```yaml
+members:
+  - name: Camel
+  - name: quarkus-platform-bom-generator
+```
+
+The version is read from the property used for the `<version>` of the `quarkus-platform-bom-maven-plugin` in `pluginManagement` (e.g. `quarkus-platform-bom-generator.version`).
 
 ### Update policies
 
